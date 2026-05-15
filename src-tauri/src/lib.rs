@@ -1,12 +1,17 @@
 use device_query::{DeviceQuery, DeviceState};
 use std::thread;
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // 프론트엔드에서 호출할 명령
 #[tauri::command]
 fn start_listening(app_handle: tauri::AppHandle) {
     println!("Starting OS level keyboard listener (Polling mode)...");
+    
+    // 마우스 클릭 통과 설정 (Click-through)
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.set_ignore_cursor_events(true);
+    }
     
     // 별도의 스레드에서 무한 루프를 돌며 키 상태를 체크
     thread::spawn(move || {
@@ -16,20 +21,17 @@ fn start_listening(app_handle: tauri::AppHandle) {
         loop {
             let current_keys = device_state.get_keys();
             
-            // 이전에 눌려있지 않았던 새로운 키가 감지되었을 때만 이벤트 발생
-            if current_keys != prev_keys && !current_keys.is_empty() {
-                // 새로운 키가 추가되었는지 확인
-                let has_new_press = current_keys.iter().any(|k| !prev_keys.contains(k));
-                
-                if has_new_press {
+            // 새로 눌린 키 각각에 대해 이벤트를 보냄 (연타 및 동시 입력 대응)
+            for key in &current_keys {
+                if !prev_keys.contains(key) {
                     let _ = app_handle.emit("typing", ());
                 }
             }
             
             prev_keys = current_keys;
             
-            // CPU 점유율 과부하 방지를 위한 미세한 대기 (약 100fps 수준)
-            thread::sleep(Duration::from_millis(10));
+            // 극단적인 반응성을 위해 2ms로 단축
+            thread::sleep(Duration::from_millis(2));
         }
     });
 }

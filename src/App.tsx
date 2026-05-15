@@ -3,9 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
+// 캐릭터 리스트
+const CHARACTERS = ["💃", "🕺", "✨", "🔥", "🐱", "🐰", "🐥"];
+
 function App() {
-  const [count, setCount] = useState(0);
-  const [isDancing, setIsDancing] = useState(false);
+  const [particles, setParticles] = useState<
+    { id: number; char: string; x: number; y: number }[]
+  >([]);
 
   useEffect(() => {
     // 1. Rust 백엔드에 키보드 리스너 시작 명령 전달
@@ -15,16 +19,20 @@ function App() {
 
     // 2. Rust에서 보내는 'typing'이벤트를 구독
     const unlisten = listen("typing", () => {
-      console.log("키보드 입력 감지!");
-      setCount((prev) => prev + 1);
+      const id = Math.random() + Date.now(); // 더 유니크한 ID
+      const newParticle = {
+        id: id,
+        char: CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)],
+        x: Math.random() * (window.innerWidth - 150),
+        y: Math.random() * (window.innerHeight - 150),
+      };
 
-      // 타이핑이 감지되면 춤추기
-      setIsDancing(true);
+      setParticles((prev) => [...prev.slice(-40), newParticle]); // 최대 동시 노출 40개로 증설
 
-      // 0.3 초 이후에 원래 상태로
+      // 애니메이션 종료 후 자동 제거
       setTimeout(() => {
-        setIsDancing(false);
-      }, 300);
+        setParticles((prev) => prev.filter((p) => p.id !== id));
+      }, 800);
     });
 
     // 앱이 꺼질 떄 리스너 해제 ( 메모리 관리 )
@@ -34,23 +42,21 @@ function App() {
   }, []);
 
   return (
-    <main className="container">
-      <h1>Dancing Keybaord</h1>
-      <p>아무 키나 눌러보세요 (다른 창에서도 작동)</p>
-
-      {/* isDancing 상태에 따라 클래스 토클 */}
-      <div 
-        className={`dancing-character ${isDancing ? "is-dancing" : ""}`}
-        style={{ marginTop: "4rem", marginBottom: "2rem" }}
-      >
-        🧑‍🩰
-      </div>
-
-      <div style={{ marginTop: "2rem" }}>
-        <h3>Total Count</h3>
-        <span style={{ fontSize: "3rem", fontWeight: "bold" }}>{count}</span>
-      </div>
-    </main>
+    <div className="container">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="dancing-character"
+          style={{
+            left: `${p.x}px`,
+            top: `${p.y}px`,
+            animation: "pop-and-dance 0.8s forwards",
+          }}
+        >
+          {p.char}
+        </div>
+      ))}
+    </div>
   );
 }
 
